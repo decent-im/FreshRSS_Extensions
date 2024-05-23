@@ -1,0 +1,8 @@
+{
+	"name": "Highlight Words",
+	"author": "LukasMega",
+	"description": "Highlight your favorite words in the feed articles.",
+	"version": "0.1.0",
+	"entrypoint": "HighlightWords",
+	"type": "user"
+}
