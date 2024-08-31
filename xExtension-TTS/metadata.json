@@ -1,0 +1,8 @@
+{
+	"name": "TTS",
+	"author": "Andriy Utkin",
+	"description": "Listen to TTS audio of articles",
+	"version": "0.0.1",
+	"entrypoint": "TTS",
+	"type": "user"
+}
