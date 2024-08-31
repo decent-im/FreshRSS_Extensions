@@ -50,8 +50,12 @@ final class FreshExtension_TTS_Controller extends Minz_ActionController {
 
 		$cmd = 'w3m -v -F -T text/html -dump -cols 9999 - ';
 		$cmd .= '| grep -v "^[[]https[]]$" '; // w3m replaces images with "[https]" lines
+		// TODO per-feed configuration of language and voice to use
 		$cmd .= '| time -o /tmp/' . $id . '.piper.time  /usr/share/piper/piper --model /piper-voices/en/en_US/lessac/high/en_US-lessac-high.onnx --output_raw ';
 		$cmd .= '| time -o /tmp/' . $id . '.ffmpeg.time ffmpeg -ar 22050 -ac 1 -f s16le -i - -f mp3 -';
+		// also save locally for caching, cheap replay, and analysis.
+		// tee is expected to survive 'broken pipe' from the web server
+		$cmd .= '| tee /tmp/' . $id . '.mp3';
 
 		$descriptorspec = array(
 			0 => array("pipe", "r"),  // stdin is a pipe that the child will read from
@@ -74,25 +78,7 @@ final class FreshExtension_TTS_Controller extends Minz_ActionController {
 		header("Content-Type: audio/mpeg");
 		//header("Cache-Control: max-age=60");
 
-		if (/* just stream it? */false) {
-			fpassthru($pipes[1]);
-			exit(0);
-		}
-
-		// save locally for caching, cheap replay, and analysis
-		$localFile = fopen($localFilePath, /* open for writing, fail if exists */'x');
-		if ($localFile) {
-			while ($chunk = fread($pipes[1], 512)) {
-				$chunkBytes = strlen($chunk);
-				$writtenToLocal = fwrite($localFile, $chunk);
-				assert($writtenToLocal === $chunkBytes);
-				echo($chunk);
-				//$writtenToRemove = fwrite(STDOUT, $chunk); // doesn't work
-				// no assert - if the user disconnects, we would prefer to finalize the file
-			}
-		}
-		// TODO record duration and audio stream size for usage accounting
-		// TODO per-feed configuration of language and voice to use
+		fpassthru($pipes[1]);
 		exit(0); // don't try to load any view
 	}
 }
