@@ -1,5 +1,7 @@
 Calls Piper TTS when you want to listen to article.
 
+<img src="screenshot.png" alt="screenshot" height=360px>
+
 You have to install stuff:
 
 * apt update && apt install -y w3m ffmpeg time
