@@ -1,6 +1,8 @@
 Calls Piper TTS when you want to listen to article.
 
-<img src="screenshot.png" alt="screenshot" height=360px>
+[Demo video](https://autkin.net/tmp/tts/demo.mp4)
+
+<img src="screenshot.png" alt="screenshot" height="360px">
 
 You have to install stuff:
 
