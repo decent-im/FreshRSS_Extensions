@@ -11,34 +11,40 @@ final class FreshExtension_TTS_Controller extends Minz_ActionController {
 	}
 
 	public function playAction(): void {
-		if (!FreshRSS_Auth::hasAccess()) {
-			Minz_Error::error(403);
+		if (!FreshRSS_Context::hasSystemConf()) {
+			throw new FreshRSS_Context_Exception('System configuration not initialised!');
 		}
 
 		$id = Minz_Request::paramString('id');
 		if ($id === '') {
 			Minz_Error::error(404);
 		}
+		$localFilePath = '/tmp/' . $id . '.mp3';
 
-		$entryDAO = FreshRSS_Factory::createEntryDao();
-		$entry = $entryDAO->searchById($id);
-		if ($entry === null) {
-			Minz_Error::error(404);
-			return;
+		if (FreshRSS_Auth::hasAccess()) {
+			$username = Minz_Session::paramString('currentUser');
+			assert($username);
+			$consumerDescription = "User $username";
+		} else {
+			// TODO if .mp3 file exists, and .who file has the default user's name, and default user's readings are made public
+			// TODO even harder: how to make this distinguishable to client javascript without a lot of HTTP requests?
+			if (
+				FreshRSS_Context::systemConf()->allow_anonymous
+				&& file_exists('/tmp/' . $id . '.who')
+				&& file_get_contents('/tmp/' . $id . '.who') === FreshRSS_Context::systemConf()->default_user
+			) {
+				$consumerDescription = "Anonymous from {$_SERVER['REMOTE_ADDR']}";
+			} else {
+				Minz_Error::error(403);
+				assert(false); // this location is unreachable
+				exit(1);
+			}
 		}
-
-		if (!FreshRSS_Context::hasSystemConf()) {
-			throw new FreshRSS_Context_Exception('System configuration not initialised!');
-		}
-
-		$username = Minz_Session::paramString('currentUser');
-		assert($username);
 
 		// save locally for caching and cheap repeat replay
-		$localFilePath = '/tmp/' . $id . '.mp3';
 		$localFile = @fopen($localFilePath, 'r');
 		if ($localFile) {
-			error_log("TTS: User '$username', entry id $id, streaming from existing audiofile");
+			error_log("TTS: $consumerDescription, entry id $id, streaming from existing audiofile");
 			$localFile = fopen($localFilePath, 'r');
 			fpassthru($localFile);
 			exit(0);
@@ -46,6 +52,23 @@ final class FreshExtension_TTS_Controller extends Minz_ActionController {
 			// Possibly support bytes-range then.
 		}
 
+		if (!isset($username)) {
+			assert(false); // this location is unreachable
+			exit(1);
+		}
+		$entryDAO = FreshRSS_Factory::createEntryDao();
+		$entry = $entryDAO->searchById($id);
+		if ($entry === null) {
+			Minz_Error::error(404);
+			return;
+		}
+		$entry->loadCompleteContent();
+		$htmlContent = $entry->title() . "\n\n" . $entry->content(/*withEnclosures=*/false);
+		$contentStrlen = strlen($htmlContent);
+		error_log("TTS: User '$username', entry id $id, running TTS on $contentStrlen bytes of text input");
+		// FIXME
+		// - only if the file doesn't exist yet
+		// - check that this entry id belongs to this user
 		file_put_contents('/tmp/' . $id . '.who', $username);
 
 		$cmd = 'w3m -v -F -T text/html -dump -cols 9999 - ';
@@ -64,10 +87,6 @@ final class FreshExtension_TTS_Controller extends Minz_ActionController {
 		);
 		$process = proc_open($cmd, $descriptorspec, $pipes/*, $cwd, $env*/);
 		assert($process);
-		$entry->loadCompleteContent();
-		$htmlContent = $entry->title() . "\n\n" . $entry->content(/*withEnclosures=*/false);
-		$contentStrlen = strlen($htmlContent);
-		error_log("TTS: User '$username', entry id $id, running TTS on $contentStrlen bytes of text input");
 		$cc = fopen('/tmp/' . $id . '.html', 'wb');
 		fwrite($cc, $htmlContent);
 		fclose($cc);
