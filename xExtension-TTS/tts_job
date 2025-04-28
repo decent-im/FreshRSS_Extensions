@@ -1,0 +1,30 @@
+#!/bin/bash
+set -euo pipefail
+
+[[ $# == 1 ]]
+DIR=$1
+[[ -d "$DIR" ]]
+INPUT_FILE=$DIR/input.html
+OUTPUT_FILE=$DIR/output.mp3
+
+MY_PID=$$
+echo                    "$MY_PID" > "$DIR/tts_job.pid"
+touch --reference=/proc/"$MY_PID"   "$DIR/tts_job.pid"
+
+# w3m replaces images with "[https]" lines
+w3m -v -F -T text/html -dump -cols 9999 "$INPUT_FILE" \
+| grep -v "^[[]https[]]$" \
+| command time -o "$DIR"/piper.time  /usr/share/piper/piper --model /piper-voices/en/en_US/lessac/high/en_US-lessac-high.onnx --output_raw \
+| command time -o "$DIR"/ffmpeg.time ffmpeg -hide_banner -ar 22050 -ac 1 -f s16le -i - -f mp3 - \
+| tee "$DIR"/output.mp3.wip
+
+mv "$DIR"/output.mp3{.wip,}
+#USERNAME=$( < "$DIR"/metadata.json  jq --raw-output .username)
+#ENTRY_ID=$( < "$DIR"/metadata.json  jq --raw-output .entry_id)
+#USER_DB_FILE=/var/www/FreshRSS/data/users/"$USERNAME"/db.sqlite
+#if ! [[ -f "$USER_DB_FILE" ]]; then exit 1; fi
+#if ! [[ "$ENTRY_ID" =~ ^[0-9]+$ ]]; then exit 1; fi
+#
+#sqlite3 "$USER_DB_FILE" <<EOF
+#INSERT OR IGNORE INTO tag (name) VALUES ('tts')
+#EOF
